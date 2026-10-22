@@ -1,0 +1,4 @@
+# Zenith Linux — paquete de shell de Plasma: Caelestia (solo lockscreen).
+# Así plasmashell no dibuja el escritorio/panel de Plasma desde el primer login.
+[Shell]
+ShellPackage=caelestia.desktop

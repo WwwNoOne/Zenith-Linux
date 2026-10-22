@@ -1,0 +1,13 @@
+# Zenith Linux — configuración de bootc-image-builder
+#
+# Se aplica a ISO, VMDK, QCOW2 y RAW. Para una ISO "de verdad" conviene
+# cambiar la contraseña de prueba antes de construirla.
+
+[customizations]
+hostname = "zenith"
+
+# Usuario de prueba. CAMBIAR la contraseña o eliminarlo en producción.
+[[customizations.user]]
+name = "zenith"
+password = "zenith"
+groups = ["wheel"]

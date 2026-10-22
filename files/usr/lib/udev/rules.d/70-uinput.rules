@@ -1,0 +1,2 @@
+# uinput para el teclado en pantalla de Caelestia (sesión activa, sin grupo input)
+KERNEL=="uinput", MODE="0600", OPTIONS+="static_node=uinput", TAG+="uaccess"

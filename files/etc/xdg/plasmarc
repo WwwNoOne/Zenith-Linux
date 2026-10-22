@@ -1,0 +1,4 @@
+# Zenith Linux — OSD de Plasma desactivado: Caelestia dibuja los suyos.
+[OSD]
+Enabled=false
+ShowOnActiveScreen=false

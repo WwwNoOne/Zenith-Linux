@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Zenith Linux — utilidades del sistema.
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Zenith Linux — utilidades
+
+  zenith update        Actualiza la imagen (bootc) y las apps Flatpak
+  zenith status        Estado de la imagen y del despliegue
+  zenith rollback      Vuelve a la imagen anterior en el próximo arranque
+  zenith reboot        Reinicia el equipo
+  zenith first-login   Repite la provisión de /home (configs de Caelestia)
+  zenith flatpak ...   Pasa los argumentos a flatpak
+  zenith doctor        Diagnóstico rápido del escritorio y los drivers
+EOF
+}
+
+case "${1:-help}" in
+    update)
+        sudo bootc upgrade
+        if command -v flatpak >/dev/null 2>&1; then
+            sudo flatpak update -y || flatpak update -y || true
+        fi
+        echo
+        echo "Actualización preparada. Reinicia con: zenith reboot"
+        ;;
+    status)
+        bootc status
+        ;;
+    rollback)
+        sudo bootc rollback
+        echo "Rollback preparado. Reinicia con: zenith reboot"
+        ;;
+    reboot)
+        systemctl reboot
+        ;;
+    first-login)
+        exec /usr/libexec/zenith/first-login --force
+        ;;
+    flatpak)
+        shift
+        exec flatpak "$@"
+        ;;
+    doctor)
+        echo "== Zenith Linux =="
+        grep -E '^(PRETTY_NAME|VERSION_ID|VARIANT)=' /etc/os-release || true
+        echo
+        echo "== bootc =="
+        bootc status || true
+        echo
+        echo "== Sesión =="
+        echo "SHELL=${SHELL:-?}  XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-?}  DESKTOP=${XDG_CURRENT_DESKTOP:-?}"
+        systemctl is-system-running || true
+        echo
+        echo "== Gráficos =="
+        if command -v nvidia-smi >/dev/null 2>&1; then
+            nvidia-smi --query-gpu=name,driver_version --format=csv,noheader || true
+        else
+            echo "nvidia-smi no disponible (AMD/Intel o imagen sin NVIDIA)"
+        fi
+        command -v vainfo >/dev/null 2>&1 \
+            && vainfo 2>/dev/null | grep -E 'Driver version|driver name|VAProfile' | head -n 8 \
+            || true
+        command -v vulkaninfo >/dev/null 2>&1 \
+            && vulkaninfo --summary 2>/dev/null | grep -E 'deviceName|driverName|apiVersion' | head -n 4 \
+            || true
+        echo
+        echo "== Caelestia =="
+        systemctl --user is-enabled caelestia-shell.service 2>/dev/null || true
+        systemctl --user is-active caelestia-shell.service 2>/dev/null || true
+        command -v quickshell || true
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

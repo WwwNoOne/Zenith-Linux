@@ -1,0 +1,7 @@
+# Zenith Linux — argumentos de kernel para NVIDIA propietario.
+# bootc los aplica al instalar y en cada actualización de imagen.
+kargs = [
+  "rd.driver.blacklist=nouveau,nova_core",
+  "modprobe.blacklist=nouveau,nova_core",
+  "nvidia-drm.modeset=1",
+]

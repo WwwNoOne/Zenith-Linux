@@ -1,0 +1,52 @@
+#!/bin/bash
+# Zenith Linux — lanzador de Caelestia Shell.
+# Lo arranca caelestia-shell.service al iniciar sesión. Antes de exec, ejecuta
+# la provisión de primer inicio (configs en /home), que es idempotente.
+
+set -uo pipefail
+
+export PATH="/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin${PATH:+:$PATH}"
+export QML2_IMPORT_PATH="/usr/lib64/qt6/qml:/etc/xdg/quickshell/caelestia"
+export CAELESTIA_LIB_DIR="/usr/lib/caelestia"
+export CAELESTIA_BIN_DIR="/usr/bin"
+export CAELESTIA_SHELL_CONFIG="/etc/xdg/quickshell/caelestia/shell.qml"
+export QS_NO_RELOAD_POPUP=1
+export QS_DROP_EXPENSIVE_FONTS=1
+export QS_DISABLE_CRASH_HANDLER=1
+export QSG_RENDER_LOOP=threaded
+export QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
+
+# Quickshell importa el módulo IPC de Hyprland por compatibilidad; en KDE no
+# hay socket y el aviso es esperado.
+if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    if [[ -n "${QT_LOGGING_RULES:-}" ]]; then
+        export QT_LOGGING_RULES="${QT_LOGGING_RULES};quickshell.hyprland.ipc.warning=false"
+    else
+        export QT_LOGGING_RULES="quickshell.hyprland.ipc.warning=false"
+    fi
+fi
+
+# Autocuración del paquete de shell de Plasma (el lockscreen de Caelestia).
+if [[ -f /usr/share/plasma/shells/caelestia.desktop/contents/lockscreen/LockScreen.qml ]]; then
+    if command -v kreadconfig6 >/dev/null 2>&1 && command -v kwriteconfig6 >/dev/null 2>&1; then
+        current_shell="$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage 2>/dev/null || true)"
+        if [[ "$current_shell" != "caelestia.desktop" ]]; then
+            kwriteconfig6 --file plasmashellrc --group Shell --key ShellPackage caelestia.desktop 2>/dev/null || true
+        fi
+        kwriteconfig6 --file kscreenlockerrc --group Greeter --key Theme --delete 2>/dev/null || true
+    fi
+fi
+
+# Provisión de /home en el primer inicio. Si falla, se reintenta al siguiente
+# login (el marcador solo se escribe al terminar).
+if ! timeout 120 /usr/libexec/zenith/first-login; then
+    echo "[zenith] aviso: la provisión de primer inicio no terminó; se reintentará" >&2
+fi
+
+QS_BIN="$(command -v quickshell || command -v qs || true)"
+if [[ -z "$QS_BIN" ]]; then
+    echo "[zenith] error: quickshell no está instalado" >&2
+    exit 1
+fi
+
+exec "$QS_BIN" -n -p "$CAELESTIA_SHELL_CONFIG"

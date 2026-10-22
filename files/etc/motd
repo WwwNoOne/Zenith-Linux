@@ -1,0 +1,13 @@
+
+  ███████╗███████╗███╗   ██╗██╗████████╗██╗  ██╗
+  ╚══███╔╝██╔════╝████╗  ██║██║╚══██╔══╝██║  ██║
+    ███╔╝ █████╗  ██╔██╗ ██║██║   ██║   ███████║
+   ███╔╝  ██╔══╝  ██║╚██╗██║██║   ██║   ██╔══██║
+  ███████╗███████╗██║ ╚████║██║   ██║   ██║  ██║
+  ╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝   ╚═╝   ╚═╝  ╚═╝
+
+  Fedora bootc + KWin Wayland + Caelestia
+
+  zenith status     estado de la imagen
+  zenith update     actualizar el sistema
+  zenith doctor     diagnóstico del escritorio

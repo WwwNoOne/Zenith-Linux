@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Zenith Linux — provisión del primer inicio, como el usuario de la sesión.
+#
+# Ejecuta los pasos de Caelestia que escriben configuración en /home. La parte
+# del sistema (/usr, /etc) ya viene horneada en la imagen; aquí no se usa dnf
+# ni sudo. Cada paso es idempotente y se registra en el log.
+
+set -uo pipefail
+
+BUNDLE_DIR="/usr/share/caelestia"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/zenith"
+MARKER="$STATE_DIR/first-login-v1.done"
+LOG="$STATE_DIR/first-login.log"
+
+if [[ "${1:-}" != "--force" && -f "$MARKER" ]]; then
+    exit 0
+fi
+
+mkdir -p "$STATE_DIR"
+
+# Evita dos ejecuciones simultáneas (autostart + relanzamiento manual).
+exec 9>"$STATE_DIR/first-login.lock"
+if ! flock -n 9; then
+    exit 0
+fi
+
+export BUNDLE_DIR
+export CAELESTIA_INSTALL_KIND=package
+export CAELESTIA_FRESH_INSTALL=1
+export INSTALL_THUNAR=false
+export INSTALL_FISH=true
+export INSTALL_SDDM=false
+
+printf '\n== Zenith first-login %s ==\n' "$(date -Is)" >>"$LOG"
+
+for step in 03-deploy-configs 04-deploy-kde 04a-window-rules 06-services 10-autostart; do
+    script="$BUNDLE_DIR/scripts/$step.sh"
+    if [[ -x "$script" ]]; then
+        printf '[zenith] %s\n' "$step" >>"$LOG"
+        "$script" >>"$LOG" 2>&1 || printf '[zenith] %s falló (ver log)\n' "$step" >>"$LOG"
+    else
+        printf '[zenith] falta %s\n' "$script" >>"$LOG"
+    fi
+done
+
+# Efecto KWin que sigue los escritorios virtuales para Caelestia.
+if command -v kwriteconfig6 >/dev/null 2>&1; then
+    kwriteconfig6 --file kwinrc --group Plugins \
+        --key kwin_workspace_trackerEnabled true 2>/dev/null || true
+fi
+
+date -Is >"$MARKER"
+printf '[zenith] primer inicio completado\n' >>"$LOG"
+exit 0

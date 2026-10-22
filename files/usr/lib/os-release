@@ -1,0 +1,15 @@
+NAME="Zenith Linux"
+VERSION="44 (Caelestia)"
+ID=zenith
+ID_LIKE="fedora"
+VERSION_ID=44
+VERSION_CODENAME=""
+PLATFORM_ID="platform:f44"
+PRETTY_NAME="Zenith Linux 44 (Caelestia)"
+ANSI_COLOR="0;38;2;126;156;255"
+HOME_URL="https://github.com/WwwNoOne/Zenith-Linux"
+DOCUMENTATION_URL="https://github.com/WwwNoOne/Zenith-Linux#readme"
+SUPPORT_URL="https://github.com/WwwNoOne/Zenith-Linux/issues"
+BUG_REPORT_URL="https://github.com/WwwNoOne/Zenith-Linux/issues"
+VARIANT="Zenith Linux"
+VARIANT_ID=zenith

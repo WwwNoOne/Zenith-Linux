@@ -1,0 +1,14 @@
+# Salidas de build
+output/
+*.iso
+*.vmdk
+*.qcow2
+*.raw
+*.vdi
+*.log
+
+# Editores / sistema
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
