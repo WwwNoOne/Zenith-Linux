@@ -96,10 +96,14 @@ para que el sistema sea viable sobre bootc:
 En PowerShell **como administrador**:
 
 ```powershell
-wsl --install -d Ubuntu
+wsl --install -d Ubuntu-24.04
 wsl --status        # debe decir "Versión predeterminada: 2"
 ```
 
+> El nombre de la distro es `Ubuntu-24.04` (el alias genérico `Ubuntu` apunta a
+> la versión más nueva, hoy 26.04). Los comandos de abajo la usan explícita.
+> `build.ps1` la detecta solo si no se pasa `-Distro`.
+>
 > Si `wsl --status` responde «WSL2 no se puede iniciar porque la virtualización
 > no está habilitada», activa **VT-x/AMD-V** (Intel VT-x o AMD-V/SVM) en la
 > BIOS/UEFI y el componente opcional «Plataforma de máquina virtual» de Windows
@@ -108,13 +112,13 @@ wsl --status        # debe decir "Versión predeterminada: 2"
 Reinicia, abre Ubuntu y crea tu usuario. Después:
 
 ```powershell
-wsl -d Ubuntu -- bash -lc "sudo apt-get update && sudo apt-get install -y podman uidmap slirp4netns fuse-overlayfs"
+wsl -d Ubuntu-24.04 -- bash -lc "sudo apt-get update && sudo apt-get install -y podman uidmap slirp4netns fuse-overlayfs"
 ```
 
 O usa el script incluido:
 
 ```powershell
-wsl -d Ubuntu -- bash -lc "bash /mnt/c/Users/P52-u/Desktop/Zenith_linux/Zenith-Linux/scripts/wsl-bootstrap.sh"
+wsl -d Ubuntu-24.04 -- bash -lc "bash /mnt/c/Users/P52-u/Desktop/Zenith_linux/Zenith-Linux/scripts/wsl-bootstrap.sh"
 ```
 
 ### 4.2 (Recomendado) trabajar dentro del disco de WSL
@@ -123,11 +127,11 @@ Compilar sobre `/mnt/c` funciona pero es **mucho** más lento. Copia el repo a
 ext4:
 
 ```powershell
-wsl -d Ubuntu -- bash -lc "mkdir -p ~/zenith && cp -a /mnt/c/Users/P52-u/Desktop/Zenith_linux/Zenith-Linux/. ~/zenith/"
+wsl -d Ubuntu-24.04 -- bash -lc "mkdir -p ~/zenith && cp -a /mnt/c/Users/P52-u/Desktop/Zenith_linux/Zenith-Linux/. ~/zenith/"
 ```
 
-A partir de aquí, edita en Windows con `\\wsl$\Ubuntu\home\<usuario>\zenith` y
-construye desde ahí. Los comandos de este README usan `~/zenith`.
+A partir de aquí, edita en Windows con `\\wsl$\Ubuntu-24.04\home\<usuario>\zenith`
+y construye desde ahí. Los comandos de este README usan `~/zenith`.
 
 ---
 
@@ -161,10 +165,19 @@ Variantes:
 
 ```bash
 ./build.sh lint     # imagen + "bootc container lint" (valida el layout)
+./build.sh verify   # imagen + comprueba el escritorio dentro del contenedor
 ./build.sh vmdk     # imagen + disco para VirtualBox
 ./build.sh iso      # imagen + ISO de instalación
 ./build.sh all      # imagen + VMDK + ISO
 ```
+
+`verify` arranca un contenedor efímero sobre la imagen y comprueba el contrato
+del escritorio: `quickshell` y los módulos QML de Caelestia, sesión Wayland,
+tema de SDDM, unidades habilitadas (`sddm`, `bluetooth`, `tuned`,
+`caelestia-shell` de usuario), Firefox, remoto de Flathub, tipografías
+registradas en fontconfig, que no queden repos de COPR y (si `WITH_NVIDIA=true`)
+que los módulos `nvidia` estén compilados. Es la validación más rápida antes de
+encender la máquina virtual.
 
 Variables útiles:
 

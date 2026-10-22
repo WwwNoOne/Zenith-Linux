@@ -89,7 +89,7 @@ RUN set -eux; \
         kernel-modules-extra linux-firmware \
         pipewire pipewire-pulseaudio wireplumber \
         NetworkManager wpa_supplicant bluez upower accountsservice \
-        power-profiles-daemon brightnessctl ddcutil; \
+        tuned-ppd brightnessctl ddcutil; \
     dnf install -y \
         quickshell-git matugen app2unit libcava gpu-screen-recorder \
         wl-clipboard cliphist inotify-tools trash-cli jq
@@ -158,10 +158,13 @@ RUN set -eux; \
 
 # ---------------------------------------------------------------------------
 #  3. Dependencias de compilación de Caelestia Shell
+#
+#  ccache no se instala a propósito: en una capa de build única no reutiliza
+#  nada y dentro del contenedor aborta con «ccache: error: File exists».
 # ---------------------------------------------------------------------------
 RUN set -eux; \
     dnf install -y \
-        cmake ninja-build ccache gcc gcc-c++ git make pkgconf-pkg-config \
+        cmake ninja-build gcc gcc-c++ git make pkgconf-pkg-config \
         qt6-qtbase-devel qt6-qtbase-private-devel qt6-qtdeclarative-devel \
         qt6-qtwayland-devel qt6-qtsvg-devel qt6-qtshadertools-devel \
         qt6-qtmultimedia-devel qt6-qt5compat-devel qt6-qttools-devel \
@@ -260,6 +263,18 @@ COPY files/ /
 RUN set -eux; \
     chmod 0755 /usr/bin/caelestia-autostart /usr/bin/zenith \
                  /usr/libexec/zenith/first-login; \
+    chmod 0644 /etc/issue /etc/motd \
+                 /etc/skel/.bashrc /etc/skel/.bash_profile \
+                 /etc/xdg/ksplashrc /etc/xdg/plasmarc /etc/xdg/plasmashellrc \
+                 /etc/sddm.conf.d/10-zenith.conf /etc/sddm.conf.d/zz-caelestia.conf \
+                 /etc/modprobe.d/zenith-nvidia.conf \
+                 /etc/modules-load.d/zenith-uinput.conf \
+                 /etc/systemd/zram-generator.conf \
+                 /usr/lib/os-release \
+                 /usr/lib/bootc/kargs.d/50-zenith-nvidia.toml \
+                 /usr/lib/environment.d/90-zenith-caelestia.conf \
+                 /usr/lib/systemd/user/caelestia-shell.service \
+                 /usr/lib/udev/rules.d/70-uinput.rules; \
     if [ ! -e /usr/bin/qdbus6 ] && [ -x /usr/bin/qdbus-qt6 ]; then \
         ln -s qdbus-qt6 /usr/bin/qdbus6; \
     fi; \
@@ -281,7 +296,7 @@ RUN set -eux; \
         -o /etc/flatpak/remotes.d/flathub.flatpakrepo; \
     sed -i 's|^SHELL=.*|SHELL=/usr/bin/fish|' /etc/default/useradd 2>/dev/null || true; \
     systemctl enable sddm.service bluetooth.service \
-        power-profiles-daemon.service fstrim.timer; \
+        tuned.service fstrim.timer; \
     systemctl set-default graphical.target; \
     systemctl --global enable caelestia-shell.service; \
     find /etc/yum.repos.d -maxdepth 1 -name '_copr*' -delete; \
@@ -303,6 +318,10 @@ RUN set -eux; \
     test -x /usr/bin/ydotool && test -x /usr/bin/ydotoold; \
     test -f /usr/lib/udev/rules.d/70-uinput.rules; \
     test -f /etc/modules-load.d/zenith-uinput.conf; \
+    test "$(stat -c '%a' /usr/lib/os-release)" = "644"; \
+    test -z "$(find /etc/sddm.conf.d /etc/xdg /etc/skel /etc/modules-load.d \
+                     /etc/modprobe.d /usr/lib/systemd/user /usr/lib/environment.d \
+                     /usr/lib/udev/rules.d -type f -perm -o+w -print -quit)"; \
     test -n "$(find /usr/lib64/qt6/plugins/kwin -name '*workspace_tracker*' -print -quit)"; \
     if [ "${WITH_NVIDIA}" = "true" ]; then \
         test -f /usr/lib/bootc/kargs.d/50-zenith-nvidia.toml; \

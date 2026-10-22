@@ -58,6 +58,11 @@ jobs:
       - name: bootc container lint
         run: sudo podman run --rm --entrypoint bootc zenith:ci container lint
 
+      - name: Verificar el escritorio dentro de la imagen
+        run: |
+          sudo env PODMAN=podman IMAGE=zenith:ci WITH_NVIDIA=false \
+            bash scripts/verify-image.sh zenith:ci
+
       - name: Iniciar sesión en ghcr.io
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |

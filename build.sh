@@ -9,6 +9,7 @@
 #    ./build.sh check      comprueba el entorno (podman, disco, red, loop)
 #    ./build.sh image      construye la imagen OCI
 #    ./build.sh lint       imagen + "bootc container lint" (validación)
+#    ./build.sh verify     imagen + comprobación del escritorio en un contenedor
 #    ./build.sh vmdk       imagen + disco VMDK (VirtualBox)
 #    ./build.sh iso        imagen + ISO de instalación (Anaconda/bootc)
 #    ./build.sh qcow2      imagen + disco QCOW2 (QEMU/KVM)
@@ -81,6 +82,12 @@ case "$TARGET" in
         echo "==> bootc container lint"
         $PODMAN run --rm --entrypoint bootc "$IMAGE" container lint
         ;;
+    verify)
+        build_image
+        echo "==> Comprobación del escritorio dentro de la imagen"
+        IMAGE="$IMAGE" PODMAN="$PODMAN" WITH_NVIDIA="$WITH_NVIDIA" \
+            bash scripts/verify-image.sh "$IMAGE"
+        ;;
     iso|vmdk|qcow2|raw)
         build_image
         build_media "$TARGET"
@@ -91,7 +98,7 @@ case "$TARGET" in
         build_media iso
         ;;
     *)
-        echo "Uso: $0 [check|image|lint|vmdk|qcow2|raw|iso|all]" >&2
+        echo "Uso: $0 [check|image|lint|verify|vmdk|qcow2|raw|iso|all]" >&2
         exit 1
         ;;
 esac
