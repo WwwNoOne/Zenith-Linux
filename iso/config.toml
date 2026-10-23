@@ -4,7 +4,9 @@
 # cambiar la contraseña de prueba antes de construirla.
 
 [customizations]
-hostname = "zenith"
+# El hostname no se configura aquí: la biblioteca de imágenes lo rechaza para
+# qcow2/vmdk ("customizations.hostname: not supported"). La imagen ya trae
+# /etc/hostname = zenith y el instalador lo sobrescribe si el usuario lo cambia.
 
 # Usuario de prueba. CAMBIAR la contraseña o eliminarlo en producción.
 [[customizations.user]]

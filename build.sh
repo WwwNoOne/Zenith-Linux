@@ -21,6 +21,8 @@
 #    CAELESTIA_REF    v2.6.3
 #    WITH_NVIDIA      true|false
 #    PODMAN           "sudo podman" (por defecto) o "podman"
+#    SKIP_IMAGE       1 = no reconstruir; usa la imagen existente (lint, verify,
+#                     vmdk, qcow2, raw, iso, all)
 ###############################################################################
 set -euo pipefail
 
@@ -33,8 +35,15 @@ WITH_NVIDIA="${WITH_NVIDIA:-true}"
 PODMAN="${PODMAN:-sudo podman}"
 BIB_IMAGE="${BIB_IMAGE:-quay.io/centos-bootc/bootc-image-builder:latest}"
 TARGET="${1:-image}"
+# SKIP_IMAGE=1 omite la reconstrucción y trabaja con la imagen ya existente.
+# Útil para iterar sobre lint/verify o para generar VMDK/ISO sin recompilar.
+SKIP_IMAGE="${SKIP_IMAGE:-0}"
 
 build_image() {
+    if [[ "$SKIP_IMAGE" == "1" ]]; then
+        echo "==> SKIP_IMAGE=1: se usa la imagen existente $IMAGE"
+        return 0
+    fi
     echo "==> Construyendo $IMAGE (Fedora $FEDORA_VERSION, Caelestia $CAELESTIA_REF, NVIDIA=$WITH_NVIDIA)"
     $PODMAN build \
         --build-arg "FEDORA_VERSION=$FEDORA_VERSION" \
@@ -59,6 +68,7 @@ build_media() {
         -v "$PWD/iso/config.toml:/config.toml:ro" \
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         "$BIB_IMAGE" \
+        build \
         --type "$type" \
         --config /config.toml \
         "$IMAGE"

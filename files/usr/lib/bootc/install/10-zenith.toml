@@ -1,0 +1,10 @@
+# Zenith Linux — configuración de instalación de bootc.
+#
+# Sistema de ficheros raíz por defecto. Lo usan tanto `bootc install` como
+# bootc-image-builder (que lo consulta con `bootc install print-configuration`);
+# sin esta clave bib aborta con «missing required info: DefaultRootFs».
+#
+# Se elige ext4 por compatibilidad universal (arranca también en WSL2 y en
+# cualquier hipervisor). Valores posibles: ext4, xfs, btrfs.
+[install]
+root-fs-type = "ext4"

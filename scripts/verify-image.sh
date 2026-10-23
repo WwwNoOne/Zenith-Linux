@@ -49,6 +49,8 @@ expect_grep() { # patrón fichero descripción
 
 echo "== Sistema =="
 expect_grep '^ID=zenith$' /usr/lib/os-release 'os-release: ID=zenith'
+# /etc/hostname no se puede leer aquí: podman lo enmascara con el hostname del
+# contenedor. Se comprueba al final, sobre el rootfs de la imagen.
 expect_grep '^PRETTY_NAME="Zenith Linux' /usr/lib/os-release 'os-release: PRETTY_NAME'
 if [ -L /etc/os-release ]; then ok '/etc/os-release es enlace simbólico'; else bad '/etc/os-release no es un enlace'; fi
 if [ "$(systemctl get-default 2>/dev/null)" = "graphical.target" ]; then
@@ -58,6 +60,11 @@ else
 fi
 exec_ /usr/bin/bootc
 exec_ /usr/bin/zenith
+if bootc install print-configuration 2>/dev/null | grep -q '"root":{"type":"ext4"}'; then
+    ok 'bootc/bib usarán ext4 como sistema de ficheros raíz'
+else
+    bad 'la imagen no declara el sistema de ficheros raíz para bootc'
+fi
 
 echo
 echo "== Shell de Caelestia =="
@@ -96,7 +103,7 @@ unit sddm.service
 have /etc/sddm.conf.d/zz-caelestia.conf
 have /usr/share/sddm/themes/caelestia/Main.qml
 expect_grep '^Current=caelestia' /etc/sddm.conf.d/zz-caelestia.conf 'SDDM usa el tema caelestia'
-expect_grep '^DefaultSession=plasma.desktop' /etc/sddm.conf.d/zz-caelestia.conf 'SDDM arranca la sesión Plasma/KWin'
+expect_grep '^DefaultSession=plasma.desktop' /etc/sddm.conf.d/10-zenith.conf 'SDDM arranca la sesión Plasma/KWin'
 unit bluetooth.service
 unit tuned.service
 unit fstrim.timer
@@ -119,6 +126,23 @@ else
     bad 'quedan ficheros _copr*.repo en /etc/yum.repos.d'
 fi
 have /usr/lib/systemd/system/tuned-ppd.service
+
+echo
+echo "== First login sin bloqueos =="
+# Caelestia pide sudo e intenta instalar matugen si la versión es < 4.2; eso
+# deja el primer inicio esperando una contraseña. Fedora 44 trae 3.1.0.
+VER_MATUGEN="$(matugen --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)"
+if [ -n "$VER_MATUGEN" ] && [ "$(printf '%s\n%s\n' 4.2 "$VER_MATUGEN" | sort -V | head -n1)" = "4.2" ]; then
+    ok "matugen $VER_MATUGEN (>= 4.2, sin prompt de sudo)"
+else
+    bad "matugen '${VER_MATUGEN:-ausente}' < 4.2: el primer inicio pedirá sudo"
+fi
+if rpm -q plasma-welcome >/dev/null 2>&1; then
+    bad 'plasma-welcome instalado (aparece el centro de bienvenida de KDE)'
+else
+    ok 'sin plasma-welcome (no aparece el centro de bienvenida)'
+fi
+if [ -d /usr/local/sbin ]; then ok '/usr/local/sbin existe (sin errores de tmpfiles)'; else bad 'falta /usr/local/sbin (systemd-tmpfiles falla en cada arranque)'; fi
 
 echo
 echo "== Tipografías =="
@@ -147,6 +171,12 @@ if [ "${NVIDIA_EXPECTED:-true}" = "true" ]; then
     else
         bad 'no hay módulos nvidia en /usr/lib/modules/*/extra/nvidia'
     fi
+    KVER="$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n')"
+    if lsinitrd "/boot/initramfs-${KVER}.img" 2>/dev/null | grep -q 'extra/nvidia/nvidia.ko'; then
+        ok 'la initramfs incluye nvidia (KMS desde el arranque)'
+    else
+        bad 'la initramfs no incluye los módulos nvidia'
+    fi
 else
     if rpm -q akmod-nvidia >/dev/null 2>&1; then
         bad 'akmod-nvidia instalado en una imagen WITH_NVIDIA=false'
@@ -170,6 +200,28 @@ exit "$([ "$FAIL" -eq 0 ] && echo 0 || echo 1)"
 CHECK
 
 status=$?
+
+# /etc/hostname va enmascarado dentro del contenedor (podman lo sustituye por el
+# hostname del contenedor), así que se lee del rootfs de la imagen: se crea el
+# contenedor sin arrancarlo y se copia el fichero.
+echo
+echo "== Hostname de la imagen =="
+CID="$($PODMAN create "$IMAGE" 2>/dev/null || true)"
+if [ -n "$CID" ]; then
+    TMP_HOST="$(mktemp)"
+    if $PODMAN cp "$CID:/etc/hostname" "$TMP_HOST" >/dev/null 2>&1 &&
+       [ "$(tr -d '[:space:]' < "$TMP_HOST")" = "zenith" ]; then
+        echo "  [ OK ]   hostname por defecto: zenith"
+    else
+        echo "  [ERROR]  hostname por defecto: zenith (esperado en /etc/hostname)"
+        status=1
+    fi
+    rm -f "$TMP_HOST"
+    $PODMAN rm "$CID" >/dev/null 2>&1
+else
+    echo "  [AVISO]  no se pudo crear un contenedor para leer /etc/hostname"
+fi
+
 echo
 if [ "$status" -eq 0 ]; then
     echo "==> Verificación superada"

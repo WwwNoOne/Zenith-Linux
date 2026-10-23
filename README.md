@@ -75,6 +75,11 @@ para que el sistema sea viable sobre bootc:
    KWin **Wayland** (`plasma.desktop`). Para usar el greeter Wayland:
    instalar `sddm-wayland-generic` (arrastra Weston) y poner
    `DisplayServer=wayland`.
+8. **matugen ≥ 4.2 desde COPR.** Fedora 44 empaqueta matugen 3.1.0 y Caelestia
+   exige 4.2 o superior: si la versión es menor, sus tareas de arranque intentan
+   instalarlo con `sudo` y el primer login se queda parado en un diálogo. La
+   imagen lo actualiza desde `avengemedia/danklinux` y el build falla si la
+   versión final no cumple.
 
 ---
 
@@ -171,13 +176,22 @@ Variantes:
 ./build.sh all      # imagen + VMDK + ISO
 ```
 
+Si la imagen ya está construida, `SKIP_IMAGE=1` evita recompilar (útil para
+repetir la validación o generar otro medio):
+
+```bash
+SKIP_IMAGE=1 ./build.sh verify
+SKIP_IMAGE=1 ./build.sh vmdk
+```
+
 `verify` arranca un contenedor efímero sobre la imagen y comprueba el contrato
 del escritorio: `quickshell` y los módulos QML de Caelestia, sesión Wayland,
 tema de SDDM, unidades habilitadas (`sddm`, `bluetooth`, `tuned`,
 `caelestia-shell` de usuario), Firefox, remoto de Flathub, tipografías
-registradas en fontconfig, que no queden repos de COPR y (si `WITH_NVIDIA=true`)
-que los módulos `nvidia` estén compilados. Es la validación más rápida antes de
-encender la máquina virtual.
+registradas en fontconfig, que no queden repos de COPR, `matugen` ≥ 4.2 y
+ausencia de `plasma-welcome` (los dos avisos que aparecían en el primer inicio)
+y, si `WITH_NVIDIA=true`, que los módulos `nvidia` estén compilados y dentro de
+la initramfs. Es la validación más rápida antes de encender la máquina virtual.
 
 Variables útiles:
 
@@ -188,6 +202,7 @@ Variables útiles:
 | `CAELESTIA_REF` | `v2.6.3` | tag de Caelestia |
 | `WITH_NVIDIA` | `true` | `false` para AMD/Intel |
 | `PODMAN` | `sudo podman` | `podman` para rootless |
+| `SKIP_IMAGE` | `0` | `1` = no reconstruir; usa la imagen existente |
 
 Ejemplo sin NVIDIA:
 
@@ -250,6 +265,47 @@ luego `growpart`/`btrfs filesystem resize` dentro de la VM.
 > VirtualBox y los drivers del host. Para validar el escritorio de verdad es
 > más fiable QEMU/KVM con `virtio-gpu` (`./build.sh qcow2`). VirtualBox sirve
 > para comprobar arranque, SDDM e instalación.
+
+### 6.1 Alternativa sin instalar VirtualBox: QEMU/KVM en WSL2
+
+WSL2 expone `/dev/kvm` (virtualización anidada), así que se puede arrancar la
+imagen a velocidad nativa desde el propio WSL y ver la pantalla por capturas:
+
+```bash
+# una sola vez, dentro de WSL2
+sudo apt-get install -y qemu-system-x86 ovmf sshpass
+
+./build.sh qcow2                     # genera output/qcow2/disk.qcow2
+bash scripts/qemu-boot-test.sh start output/qcow2/disk.qcow2
+bash scripts/qemu-boot-test.sh shot arranque      # → SDDM con el tema Caelestia
+bash scripts/qemu-boot-test.sh type zenith        # contraseña (el usuario ya viene elegido)
+bash scripts/qemu-boot-test.sh key ret
+bash scripts/qemu-boot-test.sh shot escritorio    # → escritorio con la barra de Caelestia
+bash scripts/qemu-boot-test.sh stop
+```
+
+Usa firmware UEFI (OVMF), `virtio-vga`, 4 GB de RAM y 4 vCPU por defecto
+(ajustables con `RAM=` y `CPUS=`). El log de consola queda en
+`output/qemu/serial.log`.
+
+La imagen trae `sshd` y el puerto 2222 del host se reenvía al 22 de la VM, así
+que también se puede diagnosticar sin tocar la pantalla:
+
+```bash
+sshpass -p zenith ssh -o StrictHostKeyChecking=no -p 2222 zenith@localhost \
+    'systemctl --user status caelestia-shell; journalctl --user -b | tail -n 30'
+```
+
+> **Prueba de referencia (WSL2 + KVM, octubre 2026):** arranque UEFI hasta SDDM
+> en ~20 s; login con `zenith`; sesión Plasma/KWin con la barra, el wallpaper y
+> los widgets de Caelestia (`bar-ready`, `wallpaper-ready` en el log de la
+> shell); provisión de primer inicio en ~15 s (fish, 5 escritorios virtuales,
+> reglas de ventana, servicios de usuario y `matugen` 4.2 sin pedir contraseña);
+> `caelestia-shell.service` activo y hostname `zenith`.
+>
+> El greeter tarda unos segundos en cargar su tipografía (Google Sans Flex, un
+> TTF de 4 MB que viaja dentro del tema): si se captura la pantalla nada más
+> arrancar, los textos grandes salen con la fuente de reserva. No es un fallo.
 
 ---
 
@@ -330,6 +386,13 @@ Si tu GPU es demasiado nueva para el módulo propietario, cambia
 `akmod-nvidia` por `akmod-nvidia-open` en el `Containerfile` (Turing o
 posterior).
 
+La imagen incluye además `xorg-x11-drv-nvidia-cuda` (~520 MB de librerías:
+`libcuda`, `libnvcuvid`, `libnvidia-encode` y `nvidia-smi`). Es lo que necesita
+`libva-nvidia-driver` para decodificar por hardware y lo que usan las
+aplicaciones CUDA/OpenCL. Si no lo necesitas, quita ese paquete del paso 5 del
+`Containerfile` y la imagen adelgaza en esa proporción (el resto del driver no
+se toca).
+
 ### Decodificación de vídeo por hardware
 
 Mesa ya cubre Intel y AMD (`mesa-dri-drivers` incluye los drivers VA-API en
@@ -356,10 +419,12 @@ Zenith-Linux/
 ├── Containerfile              # toda la definición del SO
 ├── build.sh                   # imagen + VMDK/ISO/QCOW2
 ├── build.ps1                  # envoltorio Windows → WSL2
-├── iso/config.toml            # usuario/hostname de bootc-image-builder
+├── iso/config.toml            # usuario de prueba de bootc-image-builder
 ├── scripts/wsl-bootstrap.sh   # Podman en Ubuntu/WSL
 ├── scripts/preflight.sh       # comprobación previa (build.sh check)
 ├── scripts/check-syntax.sh    # bash -n + RUN del Containerfile + CRLF
+├── scripts/verify-image.sh    # comprueba el escritorio dentro de la imagen
+├── scripts/qemu-boot-test.sh  # arranque en QEMU/KVM con capturas PNG
 ├── .github/workflows/         # CI: validación, imagen y lint
 └── files/                     # se copia tal cual sobre la raíz de la imagen
     ├── etc/
@@ -372,6 +437,7 @@ Zenith-Linux/
     └── usr/
         ├── bin/               # caelestia-autostart, zenith
         ├── lib/os-release     # branding
+        ├── lib/bootc/install/ # sistema de ficheros raíz por defecto (ext4)
         ├── lib/bootc/kargs.d/ # argumentos de kernel NVIDIA
         ├── lib/systemd/user/  # caelestia-shell.service
         ├── lib/udev/rules.d/  # regla uaccess para /dev/uinput
@@ -382,14 +448,21 @@ Zenith-Linux/
 
 ## 11. Limitaciones actuales y siguientes pasos
 
-- [ ] **Primer build sin validar**: los nombres de paquete ya se contrastaron
-      con Fedora 44, RPM Fusion y los COPR, todas las URLs externas del build
-      responden y scripts + bloques `RUN` pasan `bash -n`
-      (`bash scripts/check-syntax.sh`), pero el build real sigue pendiente.
-      Si algo falla, el log de `dnf` dice qué y se corrige en el `Containerfile`.
-- [ ] **Tamaño de imagen**: se instalan las dependencias `-devel` para compilar
-      Caelestia. Siguiente optimización: build multi-stage o `dnf remove` de
-      toolchain tras la compilación (hoy se prioriza que el build funcione).
+- [x] **Imagen construida, validada y arrancada** (2026-10): build completo en
+      WSL2 con Fedora 44, Caelestia v2.6.3, akmods de NVIDIA 615.78.08 para el
+      kernel 7.2.11, `bootc container lint` sin errores (4 avisos de contenido
+      en `/var`, `/boot` y `/run`), `./build.sh verify` en verde y prueba real
+      en QEMU/KVM: SDDM con el tema Caelestia, login, escritorio con la barra y
+      el wallpaper de Caelestia, primer inicio completo (matugen 4.2 sin pedir
+      contraseña), hostname `zenith` y sin el centro de bienvenida de KDE.
+- [ ] **Tamaño de imagen** (11,9 GB; qcow2 4,7 GB): está en el rango de una
+      distro ligera (5–30 GB) y no compensa tocar el toolchain: un `dnf remove`
+      masivo arrastra `akmod-nvidia` (akmods exige `gcc`, `make`,
+      `kernel-devel` y `pkgconfig(libelf)`) y `pkgconf-pkg-config` no se puede
+      quitar (`kmod` lo necesita). Si algún día se quiere recortar, la vía limpia
+      es un build multi-stage: compilar Caelestia en una etapa y copiar a la
+      final solo `/usr/bin/caelestia*`, `/usr/lib/caelestia`, los módulos QML y
+      los assets.
 - [ ] **Firma de módulos NVIDIA** para Secure Boot.
 - [ ] **`bootc-image-builder` está en transición**: el contenedor
       `quay.io/centos-bootc/bootc-image-builder` es desde 2026 un envoltorio de
@@ -417,8 +490,11 @@ Zenith-Linux/
 | SDDM no arranca / pantalla negra | `journalctl -b -u sddm`; el greeter por defecto es X11 (`sddm-x11`). Prueba `DisplayServer=wayland` solo si instalaste `sddm-wayland-generic` |
 | La sesión no aparece en SDDM | Debe existir `/usr/share/wayland-sessions/plasma.desktop` (KDE ≥ 6.4 renombró `plasmawayland.desktop`) |
 | Caelestia no aparece | `systemctl --user status caelestia-shell`; `caelestia shell -l`; log de primer inicio |
+| `plasmashell` aparece abortado en el journal al entrar | Carrera con el socket Wayland en el arranque: systemd lo relanza y queda activo (`systemctl --user status plasma-plasmashell`). Solo es un problema si se repite |
 | Iconos cuadrados / faltan símbolos | `fc-list \| grep -i "material symbols"`; deben estar en `/usr/share/fonts/zenith` |
 | El primer login no aplicó configs | Borra `~/.local/state/zenith/first-login-v1.done` y ejecuta `zenith first-login` |
+| Al entrar aparece un diálogo pidiendo la contraseña de `sudo` | `matugen --version` debe ser ≥ 4.2; con 3.1.0 Caelestia intenta instalarlo y deja el login bloqueado (la imagen ya lo sube desde el COPR) |
+| Aparece el «centro de bienvenida» de KDE | El paquete `plasma-welcome` debe estar ausente; el `Containerfile` lo quita en el paso 6 |
 | NVIDIA no carga | Secure Boot, `lsmod`, `journalctl -b -u akmods`, `nvidia-smi` |
 | El teclado en pantalla no escribe | `ls -l /dev/uinput` (necesita la regla udev con `uaccess`), `modprobe uinput`, `systemctl --user status ydotoold` |
 | Firefox no decodifica por hardware | `vainfo`; en NVIDIA exporta `LIBVA_DRIVER_NAME=nvidia` para el usuario, no globalmente |

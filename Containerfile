@@ -42,6 +42,12 @@ LABEL org.opencontainers.image.title="Zenith Linux" \
 #  Fedora no empaqueta (quickshell-git, darkly, libcava, app2unit, ...).
 #  Los .repo de COPR se eliminan al final: las actualizaciones llegan por
 #  imagen (bootc), no con dnf. RPM Fusion se conserva por trazabilidad.
+#
+#  avengemedia/danklinux: Fedora 44 empaqueta matugen 3.1.0, pero Caelestia
+#  exige >= 4.2 (con 3.1.0 el primer inicio pide sudo y se queda bloqueado en
+#  un diálogo de contraseña). Este COPR aporta 4.2.0; el paquete se actualiza
+#  al final del paso 2a. `dnf copr enable` devuelve error con este proyecto, así
+#  que se descarga el .repo a mano (se borra junto al resto de _copr*).
 # ---------------------------------------------------------------------------
 RUN set -eux; \
     dnf install -y dnf5-plugins; \
@@ -55,7 +61,10 @@ RUN set -eux; \
     dnf copr enable -y celestelove/libcava; \
     dnf copr enable -y leloubil/wl-clip-persist; \
     dnf copr enable -y brycensranch/gpu-screen-recorder-git; \
-    dnf copr enable -y atim/starship
+    dnf copr enable -y atim/starship; \
+    curl -fsSL --retry 5 \
+        "https://copr.fedorainfracloud.org/coprs/avengemedia/danklinux/repo/fedora-$(rpm -E %fedora)/avengemedia-danklinux-fedora-$(rpm -E %fedora).repo" \
+        -o /etc/yum.repos.d/_copr-avengemedia-danklinux.repo
 
 # ---------------------------------------------------------------------------
 #  2a. Sesión Wayland / KDE, hardware y shell de Caelestia
@@ -69,6 +78,10 @@ RUN set -eux; \
 #    kdialog, kmenuedit               diálogos e edición del menú de apps
 #    kde-cli-tools                    kde-open, usado por xdg-open
 #    plasma-systemsettings            ajustes del sistema
+#
+#  matugen: se instala desde el COPR (paso 1) y se confirma la versión con un
+#  upgrade explícito; `dnf install` no actualiza un paquete ya presente, y
+#  Caelestia necesita >= 4.2 para no pedir sudo en el primer inicio.
 # ---------------------------------------------------------------------------
 RUN set -eux; \
     dnf install -y \
@@ -92,7 +105,8 @@ RUN set -eux; \
         tuned-ppd brightnessctl ddcutil; \
     dnf install -y \
         quickshell-git matugen app2unit libcava gpu-screen-recorder \
-        wl-clipboard cliphist inotify-tools trash-cli jq
+        wl-clipboard cliphist inotify-tools trash-cli jq; \
+    dnf upgrade -y matugen
 
 # ---------------------------------------------------------------------------
 #  2b. Terminal, utilidades, temas, tipografías y apps base
@@ -242,6 +256,11 @@ RUN set -eux; \
         dnf install -y kernel-devel-matched akmods; \
         dnf install -y akmod-nvidia xorg-x11-drv-nvidia xorg-x11-drv-nvidia-cuda \
             libva-nvidia-driver; \
+        printf '%s\n' \
+            '# Zenith Linux: nvidia-drm debe estar en la initramfs para tomar el' \
+            '# KMS desde el arranque (RPM Fusion lo omite por defecto).' \
+            'force_drivers+=" nvidia nvidia-drm nvidia-modeset nvidia-uvm "' \
+            > /etc/dracut.conf.d/10-zenith-nvidia.conf; \
         KVER="$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort -V | tail -n1)"; \
         test "$(rpm -q kernel --qf '%{VERSION}\n' | wc -l)" -eq 1; \
         test -d "/usr/src/kernels/${KVER}"; \
@@ -257,13 +276,21 @@ RUN set -eux; \
 
 # ---------------------------------------------------------------------------
 #  6. Configuración del sistema, branding y script de primer inicio
+#
+#  Limpieza final:
+#    plasma-welcome   centro de bienvenida de KDE (aparece en el primer login y
+#                     no forma parte de Zenith; llega como recomendación)
+#    nfs-utils/rpcbind  llegan como recomendación y solo generan errores de
+#                     rpc-statd en el arranque
+#    /usr/local/sbin  falta en la imagen base y systemd-tmpfiles se queja en
+#                     cada arranque (no puede crearlo: /usr es de solo lectura)
 # ---------------------------------------------------------------------------
 COPY files/ /
 
 RUN set -eux; \
     chmod 0755 /usr/bin/caelestia-autostart /usr/bin/zenith \
                  /usr/libexec/zenith/first-login; \
-    chmod 0644 /etc/issue /etc/motd \
+    chmod 0644 /etc/issue /etc/motd /etc/hostname \
                  /etc/skel/.bashrc /etc/skel/.bash_profile \
                  /etc/xdg/ksplashrc /etc/xdg/plasmarc /etc/xdg/plasmashellrc \
                  /etc/sddm.conf.d/10-zenith.conf /etc/sddm.conf.d/zz-caelestia.conf \
@@ -271,6 +298,7 @@ RUN set -eux; \
                  /etc/modules-load.d/zenith-uinput.conf \
                  /etc/systemd/zram-generator.conf \
                  /usr/lib/os-release \
+                 /usr/lib/bootc/install/10-zenith.toml \
                  /usr/lib/bootc/kargs.d/50-zenith-nvidia.toml \
                  /usr/lib/environment.d/90-zenith-caelestia.conf \
                  /usr/lib/systemd/user/caelestia-shell.service \
@@ -294,6 +322,8 @@ RUN set -eux; \
     mkdir -p /etc/flatpak/remotes.d; \
     curl -fsSL https://flathub.org/repo/flathub.flatpakrepo \
         -o /etc/flatpak/remotes.d/flathub.flatpakrepo; \
+    dnf remove -y plasma-welcome nfs-utils rpcbind; \
+    mkdir -p /usr/local/sbin; \
     sed -i 's|^SHELL=.*|SHELL=/usr/bin/fish|' /etc/default/useradd 2>/dev/null || true; \
     systemctl enable sddm.service bluetooth.service \
         tuned.service fstrim.timer; \
@@ -315,6 +345,7 @@ RUN set -eux; \
     grep -q '^os=Zenith Linux$' /usr/share/sddm/themes/caelestia/theme.conf; \
     grep -q '^PRETTY_NAME="Zenith Linux' /etc/os-release; \
     test -f /usr/share/wayland-sessions/plasma.desktop; \
+    bootc install print-configuration | grep -q '"root":{"type":"ext4"}'; \
     test -x /usr/bin/ydotool && test -x /usr/bin/ydotoold; \
     test -f /usr/lib/udev/rules.d/70-uinput.rules; \
     test -f /etc/modules-load.d/zenith-uinput.conf; \
@@ -323,6 +354,10 @@ RUN set -eux; \
                      /etc/modprobe.d /usr/lib/systemd/user /usr/lib/environment.d \
                      /usr/lib/udev/rules.d -type f -perm -o+w -print -quit)"; \
     test -n "$(find /usr/lib64/qt6/plugins/kwin -name '*workspace_tracker*' -print -quit)"; \
+    ver="$(matugen --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)"; \
+    test "$(printf '%s\n%s\n' 4.2 "$ver" | sort -V | head -n1)" = "4.2"; \
+    ! rpm -q plasma-welcome >/dev/null 2>&1; \
+    test -d /usr/local/sbin; \
     if [ "${WITH_NVIDIA}" = "true" ]; then \
         test -f /usr/lib/bootc/kargs.d/50-zenith-nvidia.toml; \
     fi; \
