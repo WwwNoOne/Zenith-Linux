@@ -6,11 +6,24 @@ gráfica y **[Caelestia Shell](https://github.com/ladybug-me/caelestia-kde)**
 (puerto KDE) como escritorio. Firefox va en la imagen; el resto de aplicaciones
 se instalan con **Flatpak/Flathub**.
 
-> **Estado:** v0.1 — esqueleto funcional, **todavía no compilado** en este
-> equipo (no hay WSL2 ni Podman instalados). Los nombres de paquete se
-> verificaron contra los repositorios de Fedora 44, RPM Fusion y los COPR
-> (octubre 2026), pero el primer `build.sh image` real puede seguir necesitando
-> ajustes. Todo el sistema está definido en el `Containerfile`.
+> **Estado:** v0.1 — imagen construida y probada (octubre 2026): Fedora 44 con
+> Caelestia v2.6.3, driver NVIDIA 615.78.08 compilado dentro de la imagen,
+> `bootc container lint` sin errores y arranque verificado en QEMU/KVM (SDDM,
+> login, escritorio y provisión de primer inicio). Genera qcow2 para QEMU/KVM,
+> VMDK para VirtualBox e ISO de instalación. Todo el sistema está definido en el
+> `Containerfile`.
+
+## Capturas
+
+Pantalla de inicio: SDDM con el tema de Caelestia (usuario, hostname y paleta
+del sistema).
+
+![SDDM con el tema Caelestia](docs/capturas/sddm.png)
+
+Escritorio: KWin Wayland con la barra, los widgets y el wallpaper de Caelestia.
+La ventana que aparece es el aviso de novedades del primer arranque.
+
+![Escritorio de Zenith Linux con Caelestia](docs/capturas/escritorio.png)
 
 ---
 
@@ -420,6 +433,7 @@ Zenith-Linux/
 ├── build.sh                   # imagen + VMDK/ISO/QCOW2
 ├── build.ps1                  # envoltorio Windows → WSL2
 ├── iso/config.toml            # usuario de prueba de bootc-image-builder
+├── docs/capturas/             # capturas de la prueba en QEMU/KVM
 ├── scripts/wsl-bootstrap.sh   # Podman en Ubuntu/WSL
 ├── scripts/preflight.sh       # comprobación previa (build.sh check)
 ├── scripts/check-syntax.sh    # bash -n + RUN del Containerfile + CRLF
