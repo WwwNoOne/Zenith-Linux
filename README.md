@@ -250,9 +250,18 @@ Desde PowerShell puedes usar el envoltorio:
 GitHub Actions:
 
 - **validate**: `bash scripts/check-syntax.sh` (segundos, sin Podman).
-- **image**: `podman build` con `WITH_NVIDIA=false` + `bootc container lint`.
-  Si el push va a `main`, publica `ghcr.io/<usuario>/zenith-linux:latest`, que
-  se puede instalar con `bootc switch`.
+- **image**: `podman build` con `WITH_NVIDIA=false` + `bootc container lint` +
+  `verify-image.sh`. Si el push va a `main`, publica
+  `ghcr.io/wwwnone/zenith-linux:latest`, que se puede instalar con `bootc switch`.
+
+> `ghcr.io` exige minúsculas en el nombre del repositorio, así que el workflow
+> normaliza el propietario (`WwwNoOne` → `wwwnone`) antes de publicar.
+>
+> La primera vez que publica desde Actions hay que dar acceso al paquete:
+> GitHub → tu perfil → **Packages** → `zenith-linux` → *Package settings* →
+> *Manage Actions access* → añade `WwwNoOne/Zenith-Linux` con rol **Write**
+> (solo hace falta si el paquete ya existía por un push local con un token
+> personal).
 
 La ISO/VMDK no se generan en CI: osbuild necesita `/dev/loop-control` y
 privilegios que el runner no garantiza. NVIDIA queda fuera para no compilar
@@ -499,9 +508,10 @@ Zenith-Linux/
       shim/grub al contenedor).
 - [ ] **Branding del instalador**: Anaconda sigue mostrando textos de Fedora.
       Se puede personalizar con un `installer` kickstart en `iso/config.toml`.
-- [x] **CI**: workflow de GitHub Actions que valida el repo y construye la
-      imagen + `bootc container lint` en cada push. La ISO/VMDK sigue
-      construyéndose en local (osbuild necesita `/dev/loop-control`).
+- [x] **CI**: workflow de GitHub Actions que valida el repo, construye la imagen,
+      pasa `bootc container lint` y `verify-image.sh` en cada push, y publica en
+      ghcr.io. La ISO/VMDK sigue construyéndose en local (osbuild necesita
+      `/dev/loop-control`).
 - [ ] **Actualización de Caelestia**: subir `CAELESTIA_REF` y reconstruir. La
       configuración de usuario se conserva en `/home`.
 - [ ] **Fedora 45**: disponible en Quay; probar `FEDORA_VERSION=45` cuando sea

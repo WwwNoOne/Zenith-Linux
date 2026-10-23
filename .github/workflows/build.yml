@@ -10,9 +10,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/zenith-linux
-
 jobs:
   # Comprobación estática: no construye nada, tarda segundos.
   validate:
@@ -62,6 +59,14 @@ jobs:
         run: |
           sudo env PODMAN=podman IMAGE=zenith:ci WITH_NVIDIA=false \
             bash scripts/verify-image.sh zenith:ci
+
+      - name: Calcular nombre de la imagen
+        run: |
+          # ghcr.io rechaza mayúsculas en el nombre del repositorio (el propietario
+          # de GitHub puede tenerlas: WwwNoOne), así que se normaliza a minúsculas.
+          imagen="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/zenith-linux"
+          echo "IMAGE=$imagen" >> "$GITHUB_ENV"
+          echo "Imagen de destino: $imagen"
 
       - name: Iniciar sesión en ghcr.io
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
