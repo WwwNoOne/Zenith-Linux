@@ -252,7 +252,8 @@ GitHub Actions:
 - **validate**: `bash scripts/check-syntax.sh` (segundos, sin Podman).
 - **image**: `podman build` con `WITH_NVIDIA=false` + `bootc container lint` +
   `verify-image.sh`. Si el push va a `main`, publica
-  `ghcr.io/wwwnone/zenith-linux:latest`, que se puede instalar con `bootc switch`.
+  `ghcr.io/wwwnone/zenith-linux:latest` y `:sha-<commit>`, que se pueden
+  instalar con `bootc switch`.
 
 > `ghcr.io` exige minúsculas en el nombre del repositorio, así que el workflow
 > normaliza el propietario (`WwwNoOne` → `wwwnone`) antes de publicar.
@@ -262,6 +263,20 @@ GitHub Actions:
 > *Manage Actions access* → añade `WwwNoOne/Zenith-Linux` con rol **Write**
 > (solo hace falta si el paquete ya existía por un push local con un token
 > personal).
+>
+> **`:latest` es la variante sin NVIDIA.** El CI compila con `WITH_NVIDIA=false`,
+> así que la imagen publicada sirve para AMD/Intel. Para publicar la de NVIDIA,
+> constrúyela en local con otro tag:
+>
+> ```bash
+> IMAGE=ghcr.io/wwwnone/zenith-linux:nvidia ./build.sh image
+> podman push ghcr.io/wwwnone/zenith-linux:nvidia
+> bootc switch ghcr.io/wwwnone/zenith-linux:nvidia
+> ```
+>
+> **El paquete de ghcr es privado por defecto.** Para descargarlo desde otra
+> máquina hay que hacer `podman login ghcr.io` antes de `bootc switch`, o
+> cambiar la visibilidad a pública en *Package settings → Danger Zone*.
 
 La ISO/VMDK no se generan en CI: osbuild necesita `/dev/loop-control` y
 privilegios que el runner no garantiza. NVIDIA queda fuera para no compilar

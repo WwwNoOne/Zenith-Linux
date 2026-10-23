@@ -3,6 +3,10 @@ name: build
 on:
   push:
     branches: [main]
+    # Los cambios solo de documentación no necesitan reconstruir la imagen.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
   workflow_dispatch:
 
@@ -79,5 +83,8 @@ jobs:
         run: |
           sudo podman tag zenith:ci "$IMAGE:latest"
           sudo podman push "$IMAGE:latest"
-          echo "Imagen publicada: $IMAGE:latest" >> "$GITHUB_STEP_SUMMARY"
+          sha="${GITHUB_SHA::7}"
+          sudo podman tag zenith:ci "$IMAGE:sha-$sha"
+          sudo podman push "$IMAGE:sha-$sha"
+          echo "Imagen publicada: $IMAGE:latest (también $IMAGE:sha-$sha)" >> "$GITHUB_STEP_SUMMARY"
           echo "Para instalarla: bootc switch $IMAGE:latest" >> "$GITHUB_STEP_SUMMARY"
