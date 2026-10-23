@@ -197,6 +197,9 @@ SKIP_IMAGE=1 ./build.sh verify
 SKIP_IMAGE=1 ./build.sh vmdk
 ```
 
+Tamaños de referencia con `WITH_NVIDIA=true` (octubre 2026): imagen OCI
+11,9 GB, `qcow2` 4,7 GB, `vmdk` 4,8 GB, ISO 5,8 GB.
+
 `verify` arranca un contenedor efímero sobre la imagen y comprueba el contrato
 del escritorio: `quickshell` y los módulos QML de Caelestia, sesión Wayland,
 tema de SDDM, unidades habilitadas (`sddm`, `bluetooth`, `tuned`,
@@ -333,6 +336,11 @@ sshpass -p zenith ssh -o StrictHostKeyChecking=no -p 2222 zenith@localhost \
    instalador (el `zenith/zenith` de `config.toml` es solo para pruebas).
 5. Primer arranque: SDDM → sesión **Plasma (Wayland)** → Caelestia arranca
    automáticamente.
+
+> El ISO arranca con el menú GRUB ya personalizado (**«Install Zenith Linux 44»**)
+> y Anaconda lee `iso/config.toml`: crea el usuario `zenith` en el grupo `wheel`.
+> El logo y algunos textos del instalador siguen siendo de Fedora (ver
+> limitaciones). Necesita un USB de 8 GB o más.
 
 En el primer login, `caelestia-autostart` ejecuta la provisión de `/home`
 (configs, tema, autostart, servicios de usuario). Tarda unos segundos y solo
@@ -477,6 +485,10 @@ Zenith-Linux/
       es un build multi-stage: compilar Caelestia en una etapa y copiar a la
       final solo `/usr/bin/caelestia*`, `/usr/lib/caelestia`, los módulos QML y
       los assets.
+- [ ] **Instalación completa desde el ISO**: se comprobó que arranca (GRUB con
+      «Install Zenith Linux 44» y Anaconda leyendo `iso/config.toml`), pero no
+      se completó una instalación en disco ni el primer arranque del sistema ya
+      instalado. Siguiente prueba: ISO + disco virtual en QEMU, o hardware real.
 - [ ] **Firma de módulos NVIDIA** para Secure Boot.
 - [ ] **`bootc-image-builder` está en transición**: el contenedor
       `quay.io/centos-bootc/bootc-image-builder` es desde 2026 un envoltorio de
